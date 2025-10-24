@@ -1,82 +1,99 @@
-// mvc.cpp
-
 #include <iostream>
 #include <string>
-#include <unordered_map>
+#include <vector>
+#include <algorithm> // For std::find
 
-
-class DefectModel {
- public:                                                                      // (5)
-     mutable std::unordered_map<std::string, std::string> defects_ = { {"XYZ" , "File doesn't get deleted."},
-                                                                       {"XAB" , "Registry doesn't get created."},
-                                                                      {"ABC" , "Wrong title get displayed."} };
-
-    std::string getDefectComponent(const std::string& component) const {
-        return defects_[component];
-    }
-
-    int getSummary() const {
-        return defects_.size();
-    }
-
-    std::unordered_map<std::string, std::string> getAllDefects() const {
-        return defects_;
-    }
-
+// --- Model ---
+class Subject {
+public:
+    virtual void attach(class Observer* observer) = 0;
+    virtual void detach(class Observer* observer) = 0;
+    virtual void notify() = 0;
 };
 
-class DefectView {
- public:
-    void showSummary(int num) const {
-        std::cout << "Their are " + std::to_string(num) + " defects in total!\n";
-    }
-    
-    void showDefectComponent(const std::string& defect) const {
-        std::cout << "Defect of component: " + defect + '\n';
+class Observer {
+public:
+    virtual void update() = 0;
+};
+
+class DataModel : public Subject {
+private:
+    std::string data;
+    std::vector<Observer*> observers;
+
+public:
+    DataModel(const std::string& initialData) : data(initialData) {}
+
+    void setData(const std::string& newData) {
+        data = newData;
+        notify(); // Notify observers when data changes
     }
 
-    void showDefectList(const std::unordered_map<std::string, std::string>& defects) const {
-        for (const auto& p: defects) {
-            std::cout << "(" + p.first + ", " + p.second + ")\n";
+    std::string getData() const {
+        return data;
+    }
+
+    void attach(Observer* observer) override {
+        observers.push_back(observer);
+    }
+
+    void detach(Observer* observer) override {
+        observers.erase(std::remove(observers.begin(), observers.end(), observer), observers.end());
+    }
+
+    void notify() override {
+        for (Observer* obs : observers) {
+            obs->update();
         }
     }
 };
 
-class DefectController {
-    const DefectModel& defectModel;
-    const DefectView& defectView;
- public:
-    DefectController(const DefectModel& defModel, const DefectView& defView):
-                     defectModel{defModel}, defectView{defView} { }
+// --- View ---
+class ConsoleView : public Observer {
+private:
+    DataModel* model;
 
-    void showDefectComponent(const std::string& component) const {
-        defectView.showDefectComponent(defectModel.getDefectComponent(component));    // (6)
+public:
+    ConsoleView(DataModel* m) : model(m) {
+        model->attach(this); // Attach to the model to receive updates
     }
 
-    void showDefectSummary() const {
-        defectView.showSummary(defectModel.getSummary());                             // (7)
+    void update() override {
+        displayData(); // Update the view when the model changes
     }
 
-    void showDefectList() const {
-        defectView.showDefectList(defectModel.getAllDefects());                       // (8)
+    void displayData() const {
+        std::cout << "View: Current data is: " << model->getData() << std::endl;
     }
-
 };
 
+// --- Controller ---
+class DataController {
+private:
+    DataModel* model;
+
+public:
+    DataController(DataModel* m) : model(m) {}
+
+    void updateData(const std::string& newData) {
+        model->setData(newData); // Controller updates the model
+    }
+};
+
+// --- Main Application ---
 int main() {
+    // Create Model, View, and Controller instances
+    DataModel model("Initial Data");
+    ConsoleView view(&model);
+    DataController controller(&model);
 
-    std::cout << '\n';
+    // Initial display
+    view.displayData();
 
-    DefectModel defectModel;
-    DefectView defectView;
+    // User interaction (simulated by controller calls)
+    controller.updateData("New Data from Controller");
 
-    DefectController defectController(defectModel, defectView);  // (1)
-    defectController.showDefectComponent("ABC");                 // (2)
-    std::cout << '\n';
-    defectController.showDefectSummary();                        // (3)
-    std::cout << '\n';
-    defectController.showDefectList();                           // (4)
+    controller.updateData("Another Update");
 
-    std::cout << '\n';
-
+    return 0;
 }
